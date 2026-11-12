@@ -26,12 +26,35 @@ def test_json(vuln_data):
                             "1.1",
                             "1.4",
                         ],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-0",
+                                "source": "pypi",
+                                "fix_versions": [
+                                    "1.1",
+                                    "1.4",
+                                ],
+                                "aliases": ["CVE-0000-00000"],
+                                "description": "The first vulnerability",
+                            }
+                        ],
                         "aliases": ["CVE-0000-00000"],
                         "description": "The first vulnerability",
                     },
                     {
                         "id": "VULN-1",
                         "fix_versions": ["1.0"],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-1",
+                                "source": "pypi",
+                                "fix_versions": ["1.0"],
+                                "aliases": ["CVE-0000-00001"],
+                                "description": "The second vulnerability",
+                            }
+                        ],
                         "aliases": ["CVE-0000-00001"],
                         "description": "The second vulnerability",
                     },
@@ -44,6 +67,16 @@ def test_json(vuln_data):
                     {
                         "id": "VULN-2",
                         "fix_versions": [],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-2",
+                                "source": "osv",
+                                "fix_versions": [],
+                                "aliases": ["CVE-0000-00002"],
+                                "description": "The third vulnerability",
+                            }
+                        ],
                         "aliases": ["CVE-0000-00002"],
                         "description": "The third vulnerability",
                     }
@@ -69,11 +102,32 @@ def test_json_no_desc(vuln_data):
                             "1.1",
                             "1.4",
                         ],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-0",
+                                "source": "pypi",
+                                "fix_versions": [
+                                    "1.1",
+                                    "1.4",
+                                ],
+                                "aliases": ["CVE-0000-00000"],
+                            }
+                        ],
                         "aliases": ["CVE-0000-00000"],
                     },
                     {
                         "id": "VULN-1",
                         "fix_versions": ["1.0"],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-1",
+                                "source": "pypi",
+                                "fix_versions": ["1.0"],
+                                "aliases": ["CVE-0000-00001"],
+                            }
+                        ],
                         "aliases": ["CVE-0000-00001"],
                     },
                 ],
@@ -85,6 +139,15 @@ def test_json_no_desc(vuln_data):
                     {
                         "id": "VULN-2",
                         "fix_versions": [],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-2",
+                                "source": "osv",
+                                "fix_versions": [],
+                                "aliases": ["CVE-0000-00002"],
+                            }
+                        ],
                         "aliases": ["CVE-0000-00002"],
                     }
                 ],
@@ -109,10 +172,29 @@ def test_json_no_desc_no_aliases(vuln_data):
                             "1.1",
                             "1.4",
                         ],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-0",
+                                "source": "pypi",
+                                "fix_versions": [
+                                    "1.1",
+                                    "1.4",
+                                ],
+                            }
+                        ],
                     },
                     {
                         "id": "VULN-1",
                         "fix_versions": ["1.0"],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-1",
+                                "source": "pypi",
+                                "fix_versions": ["1.0"],
+                            }
+                        ],
                     },
                 ],
             },
@@ -123,6 +205,14 @@ def test_json_no_desc_no_aliases(vuln_data):
                     {
                         "id": "VULN-2",
                         "fix_versions": [],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-2",
+                                "source": "osv",
+                                "fix_versions": [],
+                            }
+                        ],
                     }
                 ],
             },
@@ -145,6 +235,18 @@ def test_json_skipped_dep(vuln_data_skipped_dep):
                         "fix_versions": [
                             "1.1",
                             "1.4",
+                        ],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-0",
+                                "source": "pypi",
+                                "fix_versions": [
+                                    "1.1",
+                                    "1.4",
+                                ],
+                                "aliases": ["CVE-0000-00000"],
+                            }
                         ],
                         "aliases": ["CVE-0000-00000"],
                     },
@@ -174,12 +276,35 @@ def test_json_fix(vuln_data, fix_data):
                             "1.1",
                             "1.4",
                         ],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-0",
+                                "source": "pypi",
+                                "fix_versions": [
+                                    "1.1",
+                                    "1.4",
+                                ],
+                                "aliases": ["CVE-0000-00000"],
+                                "description": "The first vulnerability",
+                            }
+                        ],
                         "aliases": ["CVE-0000-00000"],
                         "description": "The first vulnerability",
                     },
                     {
                         "id": "VULN-1",
                         "fix_versions": ["1.0"],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-1",
+                                "source": "pypi",
+                                "fix_versions": ["1.0"],
+                                "aliases": ["CVE-0000-00001"],
+                                "description": "The second vulnerability",
+                            }
+                        ],
                         "aliases": ["CVE-0000-00001"],
                         "description": "The second vulnerability",
                     },
@@ -192,6 +317,16 @@ def test_json_fix(vuln_data, fix_data):
                     {
                         "id": "VULN-2",
                         "fix_versions": [],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-2",
+                                "source": "osv",
+                                "fix_versions": [],
+                                "aliases": ["CVE-0000-00002"],
+                                "description": "The third vulnerability",
+                            }
+                        ],
                         "aliases": ["CVE-0000-00002"],
                         "description": "The third vulnerability",
                     }
@@ -228,12 +363,35 @@ def test_json_skipped_fix(vuln_data, skipped_fix_data):
                             "1.1",
                             "1.4",
                         ],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-0",
+                                "source": "pypi",
+                                "fix_versions": [
+                                    "1.1",
+                                    "1.4",
+                                ],
+                                "aliases": ["CVE-0000-00000"],
+                                "description": "The first vulnerability",
+                            }
+                        ],
                         "aliases": ["CVE-0000-00000"],
                         "description": "The first vulnerability",
                     },
                     {
                         "id": "VULN-1",
                         "fix_versions": ["1.0"],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-1",
+                                "source": "pypi",
+                                "fix_versions": ["1.0"],
+                                "aliases": ["CVE-0000-00001"],
+                                "description": "The second vulnerability",
+                            }
+                        ],
                         "aliases": ["CVE-0000-00001"],
                         "description": "The second vulnerability",
                     },
@@ -246,6 +404,16 @@ def test_json_skipped_fix(vuln_data, skipped_fix_data):
                     {
                         "id": "VULN-2",
                         "fix_versions": [],
+                        "merged": False,
+                        "evidence": [
+                            {
+                                "id": "VULN-2",
+                                "source": "osv",
+                                "fix_versions": [],
+                                "aliases": ["CVE-0000-00002"],
+                                "description": "The third vulnerability",
+                            }
+                        ],
                         "aliases": ["CVE-0000-00002"],
                         "description": "The third vulnerability",
                     }

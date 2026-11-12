@@ -309,8 +309,15 @@ def test_osv_vuln_withdrawn(monkeypatch):
     assert len(results) == 1
     assert dep in results
 
+    # Withdrawn records are retained and tagged rather than dropped, so that
+    # the merge step can weigh them against other sources' active records.
     vulns = results[dep]
-    assert len(vulns) == 0
+    assert len(vulns) == 1
+    assert vulns[0].withdrawn == "some-datetime"
+    assert vulns[0].is_withdrawn
+    assert vulns[0].fix_versions == []
+    assert len(vulns[0].evidence) == 1
+    assert vulns[0].evidence[0].withdrawn == "some-datetime"
 
     assert logger.debug.calls == [
         pretend.call("OSV vuln entry 'fakeid' marked as withdrawn at some-datetime")

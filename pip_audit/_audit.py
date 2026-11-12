@@ -9,27 +9,10 @@ from collections.abc import Iterator
 from dataclasses import dataclass
 
 from pip_audit._dependency_source import DependencySource
+from pip_audit._merge import merge_vulnerability_results
 from pip_audit._service import Dependency, VulnerabilityResult, VulnerabilityService
 
 logger = logging.getLogger(__name__)
-
-
-def _add_unique_vulnerability(
-    unique_vulns: list[VulnerabilityResult],
-    seen_aliases: set[str],
-    vuln: VulnerabilityResult,
-) -> None:
-    """
-    Add a vulnerability result, merging it with an existing alias match.
-    """
-
-    if seen_aliases.intersection(vuln.aliases | {vuln.id}):
-        idx, previous = next((i, p) for (i, p) in enumerate(unique_vulns) if p.alias_of(vuln))
-        unique_vulns[idx] = previous.merge_aliases(vuln)
-        return
-
-    seen_aliases.update(vuln.aliases | {vuln.id})
-    unique_vulns.append(vuln)
 
 
 @dataclass(frozen=True)
@@ -70,11 +53,17 @@ class Auditor:
         """
         Perform the auditing step, collecting dependencies from `source`.
 
-        Individual vulnerability results are uniqued based on their `aliases` sets:
-        any two results for the same dependency that share an alias are collapsed
-        into a single result with a union of all aliases.
+        Individual vulnerability results are uniqued based on their `aliases`
+        sets: any two results for the same dependency that share an identifier
+        (transitively, via aliases) are collapsed into a single result. The
+        merged result keeps the union of all aliases, the actionable fix
+        versions from every still-active record, and per-source evidence
+        describing what each service reported.
 
-        `PYSEC`-identified results are given priority over other results.
+        The merge is order-independent: reordering the service results does
+        not change the output. Results whose underlying records have all been
+        withdrawn are dropped; a result stays reported as long as any source
+        still considers it active.
         """
         specs = source.collect()
 
@@ -84,22 +73,4 @@ class Auditor:
             yield from ()
         else:
             for dep, vulns in self._service.query_all(specs):
-                unique_vulns: list[VulnerabilityResult] = []
-                seen_aliases: set[str] = set()
-
-                # First pass, add all PYSEC vulnerabilities and track their
-                # alias sets.
-                for v in vulns:
-                    if not v.id.startswith("PYSEC"):
-                        continue
-
-                    _add_unique_vulnerability(unique_vulns, seen_aliases, v)
-
-                # Second pass: add any non-PYSEC vulnerabilities.
-                for v in vulns:
-                    # If we've already seen this vulnerability by another name,
-                    # don't add it. Instead, find the previous result and update
-                    # its alias set.
-                    _add_unique_vulnerability(unique_vulns, seen_aliases, v)
-
-                yield dep, unique_vulns
+                yield dep, merge_vulnerability_results(vulns)

@@ -454,6 +454,31 @@ It can also be passed multiple times, to ignore multiple reports:
 $ pip-audit --ignore-vuln CVE-XXX-YYYY --ignore-vuln CVE-ZZZ-AAAA
 ```
 
+### How are duplicate vulnerability reports merged?
+
+The same vulnerability is often reported under more than one identifier, for
+example a `CVE-...` and a `GHSA-...` that are aliases of one another.
+`pip-audit` collapses all reports for a package version that share any
+identifier (transitively, through aliases) into a single result.
+
+Merging never discards the underlying data. In JSON output (`-f json`), every
+result carries:
+
+* `merged`: whether more than one source/record contributed to the result.
+* `evidence`: one entry per contributing source, each with its own `source`,
+  `id`, `fix_versions`, and (when enabled) `aliases` and `description`.
+* `fix_versions`: the ordered union of fix versions from every record that is
+  still active.
+* `disagreements`: present only when the sources do not line up, such as one
+  source omitting a fix version another provides, differing descriptions, or a
+  record being `withdrawn` by one source while another still reports it.
+
+Withdrawn records are kept as evidence rather than dropped outright. A finding
+is only removed once **all** of its sources have withdrawn it; while any source
+still lists an affected range, the finding remains, with the withdrawn record
+flagged under `disagreements`. The merge is deterministic, so reordering the
+incoming reports never changes the output.
+
 ### `pip-audit` takes longer than I expect!
 
 Depending on how you're using it, `pip-audit` may have to perform its

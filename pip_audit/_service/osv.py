@@ -32,6 +32,7 @@ class OsvService(VulnerabilityService):
     """
 
     DEFAULT_OSV_URL = "https://api.osv.dev/v1/query"
+    SOURCE_NAME = "osv"
 
     def __init__(
         self,
@@ -100,11 +101,13 @@ class OsvService(VulnerabilityService):
 
             id = vuln["id"]
 
-            # If the vulnerability has been withdrawn, we skip it entirely.
+            # Record whether the source has withdrawn this entry. We retain
+            # withdrawn records (tagged with the withdrawal timestamp) so that
+            # the merge step can keep them as evidence while deferring to any
+            # other source that still reports an active, affected range.
             withdrawn_at = vuln.get("withdrawn")
             if withdrawn_at is not None:
                 logger.debug(f"OSV vuln entry '{id}' marked as withdrawn at {withdrawn_at}")
-                continue
 
             # The summary is intended to be shorter, so we prefer it over
             # details, if present. However, neither is required.
@@ -120,12 +123,14 @@ class OsvService(VulnerabilityService):
             # formatting in the process).
             description = description.replace("\n", " ")
 
-            # OSV doesn't mandate this field either. There's very little we
-            # can do without it, so we skip any results that are missing it.
+            # Withdrawn records don't require a usable "affected" list; only
+            # active records need one in order to derive fix versions.
             affecteds = vuln.get("affected")
             if affecteds is None:
-                logger.warning(f"OSV vuln entry '{id}' is missing 'affected' list")
-                continue
+                if withdrawn_at is None:
+                    logger.warning(f"OSV vuln entry '{id}' is missing 'affected' list")
+                    continue
+                affecteds = []
 
             fix_versions: list[Version] = []
             for affected in affecteds:
@@ -155,6 +160,8 @@ class OsvService(VulnerabilityService):
                     description=description,
                     fix_versions=fix_versions,
                     published=self._parse_rfc3339(vuln.get("published")),
+                    source=OsvService.SOURCE_NAME,
+                    withdrawn=withdrawn_at,
                 )
             )
 

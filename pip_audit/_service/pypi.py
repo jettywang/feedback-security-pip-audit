@@ -32,6 +32,8 @@ class PyPIService(VulnerabilityService):
     package vulnerability information.
     """
 
+    SOURCE_NAME = "pypi"
+
     def __init__(
         self, cache_dir: Path | None = None, timeout: int | None = None, **kwargs: dict
     ) -> None:
@@ -96,11 +98,13 @@ class PyPIService(VulnerabilityService):
         for v in vulns:
             id = v["id"]
 
-            # If the vulnerability has been withdrawn, we skip it entirely.
+            # Record whether the source has withdrawn this entry. We retain
+            # withdrawn records (tagged with the withdrawal timestamp) so that
+            # the merge step can keep them as evidence while deferring to any
+            # other source that still reports an active, affected range.
             withdrawn_at = v.get("withdrawn")
             if withdrawn_at is not None:
                 logger.debug(f"PyPI vuln entry '{id}' marked as withdrawn at {withdrawn_at}")
-                continue
 
             # Put together the fix versions list
             try:
@@ -130,6 +134,8 @@ class PyPIService(VulnerabilityService):
                     description=description,
                     fix_versions=fix_versions,
                     published=self._parse_rfc3339(v.get("published")),
+                    source=PyPIService.SOURCE_NAME,
+                    withdrawn=withdrawn_at,
                 )
             )
 

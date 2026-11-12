@@ -34,6 +34,8 @@ class EcosystemsService(VulnerabilityService):
     package vulnerability information.
     """
 
+    SOURCE_NAME = "ecosystems"
+
     def __init__(
         self,
         cache_dir: Path | None = None,
@@ -93,10 +95,29 @@ class EcosystemsService(VulnerabilityService):
             # Get the IDs, prioritising PYSEC and CVE.
             ids: list[VulnerabilityID] = vuln["identifiers"]
 
-            # If the vulnerability has been withdrawn, we skip it entirely.
+            # Record whether the source has withdrawn this entry. Withdrawn
+            # records are retained (tagged with the withdrawal timestamp) so
+            # that the merge step keeps them as evidence while deferring to
+            # any other source that still reports an active, affected range.
             withdrawn_at = vuln["withdrawn_at"]
             if withdrawn_at is not None:
                 logger.debug(f"ESMS vuln entry '{ids[0]}' marked as withdrawn at {withdrawn_at}")
+
+                title = vuln["title"]
+                if not title:
+                    title = vuln["description"]
+                if not title:
+                    title = "N/A"
+                results.append(
+                    VulnerabilityResult.create(
+                        ids=ids,
+                        description=title.replace("\n", " "),
+                        fix_versions=[],
+                        published=self._parse_rfc3339(vuln.get("published")),
+                        source=EcosystemsService.SOURCE_NAME,
+                        withdrawn=withdrawn_at,
+                    )
+                )
                 continue
 
             # The title is intended to be shorter, so we prefer it over
@@ -149,6 +170,7 @@ class EcosystemsService(VulnerabilityService):
                     description=description,
                     fix_versions=sorted(fix_versions),
                     published=self._parse_rfc3339(vuln.get("published")),
+                    source=EcosystemsService.SOURCE_NAME,
                 )
             )
 

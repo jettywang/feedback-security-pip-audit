@@ -6,7 +6,11 @@ from packaging.version import Version
 
 from pip_audit import _audit as audit
 from pip_audit._audit import AuditOptions, Auditor
-from pip_audit._service.interface import VulnerabilityResult, VulnerabilityService
+from pip_audit._service.interface import (
+    VulnerabilityEvidence,
+    VulnerabilityResult,
+    VulnerabilityService,
+)
 
 
 def test_audit(vuln_service, dep_source):
@@ -24,6 +28,16 @@ def test_audit(vuln_service, dep_source):
                 description="this is not a real result",
                 fix_versions=[Version("1.1.0")],
                 aliases=set(),
+                source="unknown",
+                evidence=(
+                    VulnerabilityEvidence(
+                        id="fake-id",
+                        source="unknown",
+                        description="this is not a real result",
+                        fix_versions=(Version("1.1.0"),),
+                        aliases=frozenset(),
+                    ),
+                ),
             )
         ],
     )

@@ -8,6 +8,17 @@ All versions prior to 0.0.9 are untracked.
 
 ## [Unreleased]
 
+### Changed
+
+* Vulnerability results sharing any identifier (including transitive aliases
+  such as a `CVE` and `GHSA` pair) are now merged with an order-independent
+  algorithm. Each merged result keeps per-source evidence (the reporting
+  service, description, fix versions and any withdrawal timestamp) along with
+  the union of still-actionable fix versions, and the JSON output reports
+  `merged`, `evidence`, and any remaining `disagreements`. Withdrawn records
+  are retained as evidence instead of being discarded, so a finding stays
+  reported while at least one source still lists an affected range.
+
 ### Fixed
 
 * Editable requirements skipped with `--skip-editable` no longer require a hash

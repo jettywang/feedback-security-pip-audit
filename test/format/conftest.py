@@ -20,12 +20,30 @@ _TEST_VULN_DATA: dict[service.Dependency, list[service.VulnerabilityResult]] = {
                 Version("1.4"),
             ],
             aliases={"CVE-0000-00000"},
+            evidence=(
+                service.VulnerabilityEvidence(
+                    id="VULN-0",
+                    source="pypi",
+                    description="The first vulnerability",
+                    fix_versions=(Version("1.1"), Version("1.4")),
+                    aliases=frozenset({"CVE-0000-00000"}),
+                ),
+            ),
         ),
         service.VulnerabilityResult(
             id="VULN-1",
             description="The second vulnerability",
             fix_versions=[Version("1.0")],
             aliases={"CVE-0000-00001"},
+            evidence=(
+                service.VulnerabilityEvidence(
+                    id="VULN-1",
+                    source="pypi",
+                    description="The second vulnerability",
+                    fix_versions=(Version("1.0"),),
+                    aliases=frozenset({"CVE-0000-00001"}),
+                ),
+            ),
         ),
     ],
     _RESOLVED_DEP_BAR: [
@@ -34,6 +52,15 @@ _TEST_VULN_DATA: dict[service.Dependency, list[service.VulnerabilityResult]] = {
             description="The third vulnerability",
             fix_versions=[],
             aliases={"CVE-0000-00002"},
+            evidence=(
+                service.VulnerabilityEvidence(
+                    id="VULN-2",
+                    source="osv",
+                    description="The third vulnerability",
+                    fix_versions=(),
+                    aliases=frozenset({"CVE-0000-00002"}),
+                ),
+            ),
         )
     ],
 }
@@ -48,6 +75,15 @@ _TEST_VULN_DATA_SKIPPED_DEP: dict[service.Dependency, list[service.Vulnerability
                 Version("1.4"),
             ],
             aliases={"CVE-0000-00000"},
+            evidence=(
+                service.VulnerabilityEvidence(
+                    id="VULN-0",
+                    source="pypi",
+                    description="The first vulnerability",
+                    fix_versions=(Version("1.1"), Version("1.4")),
+                    aliases=frozenset({"CVE-0000-00000"}),
+                ),
+            ),
         ),
     ],
     _SKIPPED_DEP: [],

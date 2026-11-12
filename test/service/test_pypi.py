@@ -171,6 +171,16 @@ def test_pypi_mocked_response(monkeypatch, cache_dir):
         description="The first vulnerability",
         fix_versions=[Version("1.1"), Version("1.4")],
         aliases={"foo", "bar"},
+        source="pypi",
+        evidence=(
+            service.VulnerabilityEvidence(
+                id="VULN-0",
+                source="pypi",
+                description="The first vulnerability",
+                fix_versions=(Version("1.1"), Version("1.4")),
+                aliases=frozenset({"foo", "bar"}),
+            ),
+        ),
     )
 
 
@@ -208,7 +218,16 @@ def test_pypi_vuln_withdrawn(monkeypatch, cache_dir):
     )
     assert len(results) == 1
     assert dep in results
-    assert len(results[dep]) == 0
+
+    # Withdrawn records are retained and tagged rather than dropped, so that
+    # the merge step can weigh them against other sources' active records.
+    assert len(results[dep]) == 1
+    vuln = results[dep][0]
+    assert vuln.id == "VULN-0"
+    assert vuln.withdrawn == "some-timestamp"
+    assert vuln.is_withdrawn
+    assert len(vuln.evidence) == 1
+    assert vuln.evidence[0].withdrawn == "some-timestamp"
 
     assert logger.debug.calls == [
         pretend.call("PyPI vuln entry 'VULN-0' marked as withdrawn at some-timestamp")
@@ -265,6 +284,16 @@ def test_pypi_vuln_description_fallbacks(monkeypatch, cache_dir, summary, detail
         fix_versions=[Version("1.1"), Version("1.4")],
         aliases={"foo", "bar"},
         published=datetime(2019, 8, 24, 14, 15, 22),
+        source="pypi",
+        evidence=(
+            service.VulnerabilityEvidence(
+                id="VULN-0",
+                source="pypi",
+                description=description,
+                fix_versions=(Version("1.1"), Version("1.4")),
+                aliases=frozenset({"foo", "bar"}),
+            ),
+        ),
     )
 
 

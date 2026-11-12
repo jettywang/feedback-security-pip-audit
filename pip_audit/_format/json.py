@@ -9,6 +9,7 @@ from typing import Any, cast
 
 import pip_audit._fix as fix
 import pip_audit._service as service
+from pip_audit._merge import find_disagreements
 
 from .interface import VulnerabilityFormat
 
@@ -77,12 +78,33 @@ class JsonFormat(VulnerabilityFormat):
         vuln_json = {
             "id": vuln.id,
             "fix_versions": [str(version) for version in vuln.fix_versions],
+            "merged": len(vuln.evidence) > 1,
+            "evidence": [self._format_evidence(entry) for entry in vuln.evidence],
         }
+        disagreements = find_disagreements(vuln)
+        if disagreements:
+            vuln_json["disagreements"] = disagreements
         if self.output_aliases:
-            vuln_json["aliases"] = list(vuln.aliases)
+            vuln_json["aliases"] = sorted(vuln.aliases)
         if self.output_desc:
             vuln_json["description"] = vuln.description
         return vuln_json
+
+    def _format_evidence(
+        self, evidence: service.VulnerabilityEvidence
+    ) -> dict[str, Any]:
+        evidence_json = {
+            "id": evidence.id,
+            "source": evidence.source,
+            "fix_versions": [str(version) for version in evidence.fix_versions],
+        }
+        if evidence.withdrawn is not None:
+            evidence_json["withdrawn"] = evidence.withdrawn
+        if self.output_aliases:
+            evidence_json["aliases"] = sorted(evidence.aliases)
+        if self.output_desc:
+            evidence_json["description"] = evidence.description
+        return evidence_json
 
     def _format_fix(self, fix_version: fix.FixVersion) -> dict[str, Any]:
         if fix_version.is_skipped():
