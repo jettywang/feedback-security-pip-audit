@@ -14,6 +14,7 @@ from packaging.version import InvalidVersion, Version
 
 from pip_audit._cache import caching_session
 from pip_audit._service.interface import (
+    AuditStatus,
     ConnectionError,
     Dependency,
     ResolvedDependency,
@@ -82,8 +83,17 @@ class PyPIService(VulnerabilityService):
                     f"{spec.canonical_name} ({spec.version})"
                 )
                 logger.debug(skip_reason)
-                return SkippedDependency(name=spec.name, skip_reason=skip_reason), []
-            raise ServiceError from http_error
+                return (
+                    SkippedDependency(
+                        name=spec.name,
+                        skip_reason=skip_reason,
+                        audit_status=AuditStatus.NotKnown,
+                    ),
+                    [],
+                )
+            raise ServiceError(
+                f"PyPI returned an unexpected response (HTTP {response.status_code})"
+            ) from http_error
 
         response_json = response.json()
         results: list[VulnerabilityResult] = []

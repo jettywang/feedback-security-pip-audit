@@ -58,8 +58,18 @@ def test_pypi_redirect_loop(monkeypatch):
     cache_dir = pretend.stub()
     pypi = service.PyPIService(cache_dir)
 
+    dep = service.ResolvedDependency("fakedep", Version("1.0.0"))
+
+    # The per-package query still surfaces its concrete error.
     with pytest.raises(service.ConnectionError, match="PyPI is not redirecting properly"):
-        dict(pypi.query_all(iter([service.ResolvedDependency("fakedep", Version("1.0.0"))])))
+        pypi.query(dep)
+
+    # But query_all contains the failure so one bad package can't abort the audit.
+    results = dict(pypi.query_all(iter([dep])))
+    (skipped, vulns) = next(iter(results.items()))
+    assert skipped.is_skipped()
+    assert skipped.audit_status is service.AuditStatus.Error
+    assert vulns == []
 
 
 def test_pypi_connect_timeout(monkeypatch):
@@ -70,10 +80,18 @@ def test_pypi_connect_timeout(monkeypatch):
     cache_dir = pretend.stub()
     pypi = service.PyPIService(cache_dir)
 
+    dep = service.ResolvedDependency("fakedep", Version("1.0.0"))
+
     with pytest.raises(
         service.ConnectionError, match="Could not connect to PyPI's vulnerability feed"
     ):
-        dict(pypi.query_all(iter([service.ResolvedDependency("fakedep", Version("1.0.0"))])))
+        pypi.query(dep)
+
+    results = dict(pypi.query_all(iter([dep])))
+    (skipped, vulns) = next(iter(results.items()))
+    assert skipped.is_skipped()
+    assert skipped.audit_status is service.AuditStatus.Error
+    assert vulns == []
 
 
 def test_pypi_http_notfound(monkeypatch, cache_dir):
@@ -109,11 +127,14 @@ def test_pypi_http_notfound(monkeypatch, cache_dir):
     assert skipped_dep in results
     assert dep not in results
     assert len(results[skipped_dep]) == 0
+    assert skipped_dep.audit_status is service.AuditStatus.NotKnown
+    assert skipped_dep.audit_status.has_valid_result is False
     assert len(logger.debug.calls) == 1
 
 
 def test_pypi_http_error(monkeypatch, cache_dir):
-    # Any error response other than "not found" should raise an error.
+    # Any error response other than "not found" raises from query(), but query_all()
+    # contains it as an explicit error skip instead of aborting the whole audit.
     def get_error_response():
         class MockResponse:
             # 403: Forbidden
@@ -131,7 +152,13 @@ def test_pypi_http_error(monkeypatch, cache_dir):
     pypi = service.PyPIService(cache_dir)
     dep = service.ResolvedDependency("jinja2", Version("2.4.1"))
     with pytest.raises(service.ServiceError):
-        dict(pypi.query_all(iter([dep])))
+        pypi.query(dep)
+
+    results = dict(pypi.query_all(iter([dep])))
+    (skipped, vulns) = next(iter(results.items()))
+    assert skipped.is_skipped()
+    assert skipped.audit_status is service.AuditStatus.Error
+    assert vulns == []
 
 
 def test_pypi_mocked_response(monkeypatch, cache_dir):
@@ -291,6 +318,10 @@ def test_pypi_no_vuln_key(monkeypatch, cache_dir):
     assert len(results) == 1
     assert dep in results
     assert not results[dep]
+    # An empty vulnerability list backed by a successful query is explicitly "clean".
+    assert not dep.is_skipped()
+    assert dep.audit_status is service.AuditStatus.Success
+    assert dep.audit_status.has_valid_result is True
 
 
 def test_pypi_invalid_version(monkeypatch, cache_dir):
@@ -320,7 +351,14 @@ def test_pypi_invalid_version(monkeypatch, cache_dir):
     pypi = service.PyPIService(cache_dir)
     dep = service.ResolvedDependency("foo", Version("1.0"))
     with pytest.raises(service.ServiceError):
-        dict(pypi.query_all(iter([dep])))
+        pypi.query(dep)
+
+    # A malformed payload is a query failure: contained as an error skip.
+    results = dict(pypi.query_all(iter([dep])))
+    (skipped, vulns) = next(iter(results.items()))
+    assert skipped.is_skipped()
+    assert skipped.audit_status is service.AuditStatus.Error
+    assert vulns == []
 
 
 def test_pypi_skipped_dep(cache_dir):

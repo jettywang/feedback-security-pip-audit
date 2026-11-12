@@ -9,12 +9,49 @@ from abc import ABC, abstractmethod
 from collections.abc import Iterator
 from dataclasses import dataclass, replace
 from datetime import datetime
+from enum import Enum
 from typing import Any, NewType
 
 from packaging.utils import canonicalize_name
 from packaging.version import Version
 
 VulnerabilityID = NewType("VulnerabilityID", str)
+
+
+class AuditStatus(Enum):
+    """
+    The outcome of attempting to audit a single dependency.
+
+    This distinguishes a dependency that was *successfully queried and has no
+    vulnerabilities from one that could not be given a valid query result
+    (because it was unknown to the service or the query failed). Both can end up
+    next to an empty vulnerability list, so the empty list alone is ambiguous.
+    """
+
+    Success = "success"
+    """
+    The service returned a valid response for the dependency. An accompanying
+    empty vulnerability list means "queried and found no vulnerabilities".
+    """
+
+    NotKnown = "not_known"
+    """
+    The service explicitly reported the dependency/version as unknown (e.g. an
+    HTTP 404 from PyPI). No vulnerability result is available.
+    """
+
+    Error = "error"
+    """
+    The query could not be completed (rate limiting, server error, timeout,
+    malformed response, ...). No vulnerability result is available.
+    """
+
+    @property
+    def has_valid_result(self) -> bool:
+        """
+        Whether the dependency received a valid, trustworthy query result.
+        """
+        return self is AuditStatus.Success
 
 
 def _id_comparison_key(id: str) -> int:
@@ -60,6 +97,17 @@ class Dependency:
         """
         return self.__class__ is SkippedDependency
 
+    @property
+    def audit_status(self) -> AuditStatus:
+        """
+        The outcome of auditing this dependency.
+
+        A resolved (non-skipped) dependency was successfully queried, so its
+        status is always `AuditStatus.Success`; skipped dependencies carry an
+        explicit non-success status.
+        """
+        return AuditStatus.Success
+
 
 @dataclass(frozen=True)
 class ResolvedDependency(Dependency):
@@ -77,6 +125,7 @@ class SkippedDependency(Dependency):
     """
 
     skip_reason: str
+    audit_status: AuditStatus = AuditStatus.NotKnown
 
 
 @dataclass(frozen=True)
@@ -175,9 +224,26 @@ class VulnerabilityService(ABC):
 
         `VulnerabilityService` implementations can override this implementation with
         a more optimized one, if they support batched or bulk requests.
+
+        A failure to query a single dependency is contained rather than allowed to
+        abort the whole audit: the offending dependency is yielded as an
+        `SkippedDependency` whose `audit_status` is `AuditStatus.Error`, so the
+        formatted result can distinguish "queried and clean" from "never got a
+        result". Dependencies that were already skipped are passed through untouched.
         """
         for spec in specs:
-            yield self.query(spec)
+            try:
+                yield self.query(spec)
+            except ServiceError as e:
+                if spec.is_skipped():
+                    yield spec, []
+                else:
+                    skipped = SkippedDependency(
+                        name=spec.name,
+                        skip_reason=f"Failed to query vulnerability service: {e}",
+                        audit_status=AuditStatus.Error,
+                    )
+                    yield skipped, []
 
     @staticmethod
     def _parse_rfc3339(dt: str | None) -> datetime | None:

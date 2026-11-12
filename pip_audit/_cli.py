@@ -35,6 +35,7 @@ from pip_audit._format import (
 from pip_audit._service import EcosystemsService, OsvService, PyPIService
 from pip_audit._service.interface import ConnectionError as VulnServiceConnectionError
 from pip_audit._service.interface import (
+    AuditStatus,
     Dependency,
     ResolvedDependency,
     SkippedDependency,
@@ -556,6 +557,13 @@ def audit() -> None:  # pragma: no cover
                     spec = cast(SkippedDependency, spec)
                     if args.strict:
                         _fatal(f"{spec.name}: {spec.skip_reason}")
+                    elif spec.audit_status is AuditStatus.Error:
+                        # A query failure (rate limit, 5xx, timeout, ...) is more
+                        # serious than a benign "not on the index" skip: surface it
+                        # loudly, but keep auditing the remaining dependencies so the
+                        # emitted manifest still covers every package.
+                        logger.error(f"Skipping {spec.name}: {spec.skip_reason}")
+                        state.update_state(f"Skipping {spec.name}: {spec.skip_reason}")
                     else:
                         state.update_state(f"Skipping {spec.name}: {spec.skip_reason}")
                     skip_count += 1

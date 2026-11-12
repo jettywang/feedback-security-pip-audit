@@ -19,6 +19,8 @@ def test_json(vuln_data):
             {
                 "name": "foo",
                 "version": "1.0",
+                "audit_status": "success",
+                "has_vulnerability_result": True,
                 "vulns": [
                     {
                         "id": "VULN-0",
@@ -40,6 +42,8 @@ def test_json(vuln_data):
             {
                 "name": "bar",
                 "version": "0.1",
+                "audit_status": "success",
+                "has_vulnerability_result": True,
                 "vulns": [
                     {
                         "id": "VULN-2",
@@ -51,6 +55,13 @@ def test_json(vuln_data):
             },
         ],
         "fixes": [],
+        "coverage": {
+            "total": 2,
+            "valid_query_result": 2,
+            "not_known": 0,
+            "error": 0,
+            "complete": True,
+        },
     }
     assert json_format.format(vuln_data, []) == json.dumps(expected_json)
 
@@ -62,6 +73,8 @@ def test_json_no_desc(vuln_data):
             {
                 "name": "foo",
                 "version": "1.0",
+                "audit_status": "success",
+                "has_vulnerability_result": True,
                 "vulns": [
                     {
                         "id": "VULN-0",
@@ -81,6 +94,8 @@ def test_json_no_desc(vuln_data):
             {
                 "name": "bar",
                 "version": "0.1",
+                "audit_status": "success",
+                "has_vulnerability_result": True,
                 "vulns": [
                     {
                         "id": "VULN-2",
@@ -91,6 +106,13 @@ def test_json_no_desc(vuln_data):
             },
         ],
         "fixes": [],
+        "coverage": {
+            "total": 2,
+            "valid_query_result": 2,
+            "not_known": 0,
+            "error": 0,
+            "complete": True,
+        },
     }
     assert json_format.format(vuln_data, []) == json.dumps(expected_json)
 
@@ -102,6 +124,8 @@ def test_json_no_desc_no_aliases(vuln_data):
             {
                 "name": "foo",
                 "version": "1.0",
+                "audit_status": "success",
+                "has_vulnerability_result": True,
                 "vulns": [
                     {
                         "id": "VULN-0",
@@ -119,6 +143,8 @@ def test_json_no_desc_no_aliases(vuln_data):
             {
                 "name": "bar",
                 "version": "0.1",
+                "audit_status": "success",
+                "has_vulnerability_result": True,
                 "vulns": [
                     {
                         "id": "VULN-2",
@@ -128,6 +154,13 @@ def test_json_no_desc_no_aliases(vuln_data):
             },
         ],
         "fixes": [],
+        "coverage": {
+            "total": 2,
+            "valid_query_result": 2,
+            "not_known": 0,
+            "error": 0,
+            "complete": True,
+        },
     }
     assert json_format.format(vuln_data, []) == json.dumps(expected_json)
 
@@ -139,6 +172,8 @@ def test_json_skipped_dep(vuln_data_skipped_dep):
             {
                 "name": "foo",
                 "version": "1.0",
+                "audit_status": "success",
+                "has_vulnerability_result": True,
                 "vulns": [
                     {
                         "id": "VULN-0",
@@ -152,10 +187,19 @@ def test_json_skipped_dep(vuln_data_skipped_dep):
             },
             {
                 "name": "bar",
+                "audit_status": "not_known",
+                "has_vulnerability_result": False,
                 "skip_reason": "skip-reason",
             },
         ],
         "fixes": [],
+        "coverage": {
+            "total": 2,
+            "valid_query_result": 1,
+            "not_known": 1,
+            "error": 0,
+            "complete": False,
+        },
     }
     assert json_format.format(vuln_data_skipped_dep, []) == json.dumps(expected_json)
 
@@ -167,6 +211,8 @@ def test_json_fix(vuln_data, fix_data):
             {
                 "name": "foo",
                 "version": "1.0",
+                "audit_status": "success",
+                "has_vulnerability_result": True,
                 "vulns": [
                     {
                         "id": "VULN-0",
@@ -188,6 +234,8 @@ def test_json_fix(vuln_data, fix_data):
             {
                 "name": "bar",
                 "version": "0.1",
+                "audit_status": "success",
+                "has_vulnerability_result": True,
                 "vulns": [
                     {
                         "id": "VULN-2",
@@ -210,6 +258,13 @@ def test_json_fix(vuln_data, fix_data):
                 "new_version": "0.3",
             },
         ],
+        "coverage": {
+            "total": 2,
+            "valid_query_result": 2,
+            "not_known": 0,
+            "error": 0,
+            "complete": True,
+        },
     }
     assert json_format.format(vuln_data, fix_data) == json.dumps(expected_json)
 
@@ -221,6 +276,8 @@ def test_json_skipped_fix(vuln_data, skipped_fix_data):
             {
                 "name": "foo",
                 "version": "1.0",
+                "audit_status": "success",
+                "has_vulnerability_result": True,
                 "vulns": [
                     {
                         "id": "VULN-0",
@@ -242,6 +299,8 @@ def test_json_skipped_fix(vuln_data, skipped_fix_data):
             {
                 "name": "bar",
                 "version": "0.1",
+                "audit_status": "success",
+                "has_vulnerability_result": True,
                 "vulns": [
                     {
                         "id": "VULN-2",
@@ -260,5 +319,12 @@ def test_json_skipped_fix(vuln_data, skipped_fix_data):
             },
             {"name": "bar", "version": "0.1", "skip_reason": "skip-reason"},
         ],
+        "coverage": {
+            "total": 2,
+            "valid_query_result": 2,
+            "not_known": 0,
+            "error": 0,
+            "complete": True,
+        },
     }
     assert json_format.format(vuln_data, skipped_fix_data) == json.dumps(expected_json)

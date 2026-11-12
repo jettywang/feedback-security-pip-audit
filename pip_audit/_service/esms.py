@@ -77,7 +77,9 @@ class EcosystemsService(VulnerabilityService):
         except requests.ConnectTimeout:
             raise ConnectionError("Could not connect to ESMS' vulnerability feed")
         except requests.HTTPError as http_error:
-            raise ServiceError from http_error
+            raise ServiceError(
+                f"Ecosyste.ms returned an unexpected response (HTTP {response.status_code})"
+            ) from http_error
 
         # If the response is empty, that means that the package/version pair doesn't have any
         # associated vulnerabilities
