@@ -22,6 +22,7 @@ from pip_audit._dependency_source import (
     PipSource,
     PyProjectSource,
     RequirementSource,
+    StrictRequirementSource,
 )
 from pip_audit._dependency_source.pylock import PyLockSource
 from pip_audit._fix import ResolvedFixVersion, SkippedFixVersion, resolve_fix_versions
@@ -391,6 +392,13 @@ def _parser() -> argparse.ArgumentParser:  # pragma: no cover
         "this can only be used with hashed requirements files or if the `--no-deps` flag has been "
         "provided",
     )
+    parser.add_argument(
+        "--read-only",
+        action="store_true",
+        help="audit requirements files in strict read-only mode: only requirements pinned to an "
+        "exact version (`name==version`) are audited and no dependency resolution, download, "
+        "install, or build is ever performed; all other lines are reported as skipped",
+    )
     return parser
 
 
@@ -476,6 +484,16 @@ def audit() -> None:  # pragma: no cover
             parser.error("The --no-deps flag can only be used with --requirement (-r)")
         elif args.disable_pip:
             parser.error("The --disable-pip flag can only be used with --requirement (-r)")
+        elif args.read_only:
+            parser.error("The --read-only flag can only be used with --requirement (-r)")
+
+    if args.read_only:
+        if args.fix:
+            parser.error("The --fix flag cannot be used with --read-only")
+        elif args.require_hashes:
+            parser.error("The --require-hashes flag cannot be used with --read-only")
+        elif args.index_url or args.extra_index_urls:
+            parser.error("Index URL flags have no effect with --read-only")
 
     # Nudge users to consider alternate workflows.
     if args.require_hashes and args.no_deps:
@@ -509,16 +527,19 @@ def audit() -> None:  # pragma: no cover
                 if not req.exists():
                     _fatal(f"invalid requirements input: {req}")
 
-            source = RequirementSource(
-                args.requirements,
-                require_hashes=args.require_hashes,
-                no_deps=args.no_deps,
-                disable_pip=args.disable_pip,
-                skip_editable=args.skip_editable,
-                index_url=args.index_url,
-                extra_index_urls=args.extra_index_urls,
-                state=state,
-            )
+            if args.read_only:
+                source = StrictRequirementSource(args.requirements, state=state)
+            else:
+                source = RequirementSource(
+                    args.requirements,
+                    require_hashes=args.require_hashes,
+                    no_deps=args.no_deps,
+                    disable_pip=args.disable_pip,
+                    skip_editable=args.skip_editable,
+                    index_url=args.index_url,
+                    extra_index_urls=args.extra_index_urls,
+                    state=state,
+                )
         elif args.project_path is not None:
             # NOTE: We'll probably want to support --skip-editable here,
             # once PEP 660 is more widely supported: https://www.python.org/dev/peps/pep-0660/

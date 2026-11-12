@@ -8,6 +8,15 @@ All versions prior to 0.0.9 are untracked.
 
 ## [Unreleased]
 
+### Added
+
+* Added a strict read-only audit mode for requirements files, enabled with
+  `--read-only`: only requirements pinned to an exact version
+  (`name==version`) are audited, no dependency resolution, download,
+  install, or build is ever performed, and lines that cannot be audited
+  (VCS, editable, local path, sdist/wheel, URL, or unpinned requirements)
+  are reported as skipped with a reason
+
 ### Fixed
 
 * Editable requirements skipped with `--skip-editable` no longer require a hash

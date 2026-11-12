@@ -142,7 +142,7 @@ usage: pip-audit [-h] [-V] [-l] [-r REQUIREMENT] [--locked] [-f FORMAT]
                  [--timeout TIMEOUT] [--path PATH] [-v] [--fix]
                  [--require-hashes] [--index-url INDEX_URL]
                  [--extra-index-url URL] [--skip-editable] [--no-deps]
-                 [-o FILE] [--ignore-vuln ID] [--disable-pip]
+                 [-o FILE] [--ignore-vuln ID] [--disable-pip] [--read-only]
                  [project_path]
 
 audit the Python environment for dependencies with known vulnerabilities
@@ -226,6 +226,12 @@ options:
   --disable-pip         don't use `pip` for dependency resolution; this can
                         only be used with hashed requirements files or if the
                         `--no-deps` flag has been provided (default: False)
+  --read-only           audit requirements files in strict read-only mode:
+                        only requirements pinned to an exact version
+                        (`name==version`) are audited and no dependency
+                        resolution, download, install, or build is ever
+                        performed; all other lines are reported as skipped
+                        (default: False)
 ```
 <!-- @end-pip-audit-help@ -->
 
@@ -489,6 +495,22 @@ $ pip-audit --no-deps -r requirements.txt
 
 # fails if any dependency is not fully pinned *or* is missing hashes
 $ pip-audit --require-hashes -r requirements.txt
+```
+
+If the requirements file comes from an untrusted source (for example, an
+uploaded manifest in a hosted audit service), you can use `--read-only` to
+audit it in strict read-only mode: only requirements pinned to an exact
+version (`name==version`) are sent to the vulnerability service, no
+dependency resolution, download, install, or build is ever performed, and
+every line that cannot be audited this way (VCS, editable, local path,
+sdist/wheel, URL, or unpinned requirements) is reported as skipped with a
+reason. Local `-r`/`--requirement` includes and `-c`/`--constraint` files
+are followed, and exact-pin constraints are applied to unpinned
+requirements.
+
+```console
+# audits only exact pins; never resolves, installs, or builds anything
+$ pip-audit --read-only -r requirements.txt
 ```
 
 ### `pip-audit` can't authenticate to my third-party index!

@@ -13,6 +13,7 @@ from .pip import PipSource, PipSourceError
 from .pylock import PyLockSource
 from .pyproject import PyProjectSource
 from .requirement import RequirementSource
+from .strict import StrictRequirementSource
 
 __all__ = [
     "PYPI_URL",
@@ -25,4 +26,5 @@ __all__ = [
     "PyLockSource",
     "PyProjectSource",
     "RequirementSource",
+    "StrictRequirementSource",
 ]
