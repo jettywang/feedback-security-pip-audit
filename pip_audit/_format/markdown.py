@@ -82,8 +82,8 @@ class MarkdownFormat(VulnerabilityFormat):
             header += " | Description"
             border += " | ---"
 
-        vuln_rows = [
-            self._format_vuln(
+        rendered_vulns = [
+            (
                 cast(service.ResolvedDependency, dep),
                 vuln,
                 next((f for f in fixes if f.dep == dep), None),
@@ -91,6 +91,17 @@ class MarkdownFormat(VulnerabilityFormat):
             for dep, vulns in result.items()
             if not dep.is_skipped()
             for vuln in vulns
+        ]
+        include_ignored_reason = any(
+            getattr(vuln, "ignored_reason", None) is not None for _dep, vuln, _fix in rendered_vulns
+        )
+        if include_ignored_reason:
+            header += " | Exception Reason"
+            border += " | ---"
+
+        vuln_rows = [
+            self._format_vuln(dep, vuln, applied_fix, include_ignored_reason)
+            for dep, vuln, applied_fix in rendered_vulns
         ]
 
         if not vuln_rows:
@@ -108,6 +119,7 @@ class MarkdownFormat(VulnerabilityFormat):
         dep: service.ResolvedDependency,
         vuln: service.VulnerabilityResult,
         applied_fix: fix.FixVersion | None,
+        include_ignored_reason: bool = False,
     ) -> str:
         name_link = _md_link(dep.canonical_name, pypi_url(dep.canonical_name))
         id_link = _md_link(vuln.id, vuln_id_url(vuln.id))
@@ -122,6 +134,8 @@ class MarkdownFormat(VulnerabilityFormat):
             vuln_text += f" | {linked_aliases}"
         if self.output_desc:
             vuln_text += f" | {vuln.description}"
+        if include_ignored_reason:
+            vuln_text += f" | {getattr(vuln, 'ignored_reason', None) or ''}"
         return vuln_text
 
     def _format_fix_versions(self, fix_versions: list[Version]) -> str:

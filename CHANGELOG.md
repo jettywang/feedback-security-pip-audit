@@ -8,6 +8,14 @@ All versions prior to 0.0.9 are untracked.
 
 ## [Unreleased]
 
+### Added
+
+* Added the `--vuln-exception` flag, which suppresses a vulnerability ID only
+  for a specific package and PEP 440 version range, optionally with an
+  expiration date and a justification that is retained in the audit report.
+  This complements `--ignore-vuln`, which suppresses an ID across all packages
+  and versions.
+
 ### Fixed
 
 * Editable requirements skipped with `--skip-editable` no longer require a hash

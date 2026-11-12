@@ -142,7 +142,9 @@ usage: pip-audit [-h] [-V] [-l] [-r REQUIREMENT] [--locked] [-f FORMAT]
                  [--timeout TIMEOUT] [--path PATH] [-v] [--fix]
                  [--require-hashes] [--index-url INDEX_URL]
                  [--extra-index-url URL] [--skip-editable] [--no-deps]
-                 [-o FILE] [--ignore-vuln ID] [--disable-pip]
+                 [-o FILE] [--ignore-vuln ID]
+                 [--vuln-exception ID:PACKAGE:VERSION_SPEC[:EXPIRES[:REASON]]]
+                 [--disable-pip]
                  [project_path]
 
 audit the Python environment for dependencies with known vulnerabilities
@@ -223,6 +225,13 @@ options:
   --ignore-vuln ID      ignore a specific vulnerability by its vulnerability
                         ID; this option can be used multiple times (default:
                         [])
+  --vuln-exception ID:PACKAGE:VERSION_SPEC[:EXPIRES[:REASON]]
+                        suppress a vulnerability ID only for a specific
+                        package and PEP 440 version range, optionally until an
+                        ISO YYYY-MM-DD expiration date and with a
+                        justification that is retained in the report; this
+                        option can be used multiple times and does not affect
+                        other packages or versions (default: [])
   --disable-pip         don't use `pip` for dependency resolution; this can
                         only be used with hashed requirements files or if the
                         `--no-deps` flag has been provided (default: False)
@@ -453,6 +462,42 @@ It can also be passed multiple times, to ignore multiple reports:
 # Run the audit as normal, but exclude any reports that match these IDs
 $ pip-audit --ignore-vuln CVE-XXX-YYYY --ignore-vuln CVE-ZZZ-AAAA
 ```
+
+#### Scoped, time-limited exceptions with `--vuln-exception`
+
+`--ignore-vuln` suppresses a vulnerability ID across **every** package and
+version. When a security review only approves a specific package version for a
+limited time, use `--vuln-exception` instead. It narrows the suppression to
+reports that match all of its constraints, leaving every other affected package
+or version as an ordinary, failing vulnerability.
+
+The specification has the form
+`ID:PACKAGE:VERSION_SPEC[:EXPIRES[:REASON]]`:
+
+- `ID`: the vulnerability ID, matched case-insensitively against each report's
+  primary ID and its aliases (so a `CVE-xxx`, `GHSA-xxx`, or `PYSEC-xxx` ID all
+  work).
+- `PACKAGE`: the affected package name (PEP 503 canonicalization is applied).
+- `VERSION_SPEC`: a PEP 440 version specifier, such as `>=1.0,<2.0`.
+- `EXPIRES`: an optional ISO `YYYY-MM-DD` date; the exception matches through
+  that day and stops matching the day after.
+- `REASON`: an optional free-text justification (colons are allowed) that is
+  retained in the audit report next to each suppressed report.
+
+For example, this suppresses `CVE-2024-1234` only for `some-pkg` versions in
+the `1.x` series, until the end of November 2026:
+
+```console
+$ pip-audit --vuln-exception \
+    "CVE-2024-1234:some-pkg:>=1.0,<2.0:2026-11-30:risk accepted by security review"
+```
+
+The same CVE reported for another package, another version, or after the
+expiration date is still reported normally. Like `--ignore-vuln`,
+`--vuln-exception` can be repeated and combined with the other auditing
+options. Suppressed reports remain in the output with their exception reason
+(in the `Exception Reason` column, or the `ignored_reason` JSON field), so the
+justification is preserved for reviewers.
 
 ### `pip-audit` takes longer than I expect!
 

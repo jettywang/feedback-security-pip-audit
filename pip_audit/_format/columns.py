@@ -92,10 +92,9 @@ class ColumnsFormat(VulnerabilityFormat):
             header.append("Aliases")
         if self.output_desc:
             header.append("Description")
-        vuln_data.append(header)
 
-        vuln_rows = [
-            self._format_vuln(
+        rendered_vulns = [
+            (
                 cast(service.ResolvedDependency, dep),
                 vuln,
                 next((f for f in fixes if f.dep == dep), None),
@@ -103,6 +102,18 @@ class ColumnsFormat(VulnerabilityFormat):
             for dep, vulns in result.items()
             if not dep.is_skipped()
             for vuln in vulns
+        ]
+        include_ignored_reason = any(
+            getattr(vuln, "ignored_reason", None) is not None for _dep, vuln, _fix in rendered_vulns
+        )
+        if include_ignored_reason:
+            header.append("Exception Reason")
+
+        vuln_data.append(header)
+
+        vuln_rows = [
+            self._format_vuln(dep, vuln, applied_fix, include_ignored_reason)
+            for dep, vuln, applied_fix in rendered_vulns
         ]
 
         vuln_data.extend(vuln_rows)
@@ -148,6 +159,7 @@ class ColumnsFormat(VulnerabilityFormat):
         dep: service.ResolvedDependency,
         vuln: service.VulnerabilityResult,
         applied_fix: fix.FixVersion | None,
+        include_ignored_reason: bool = False,
     ) -> list[Any]:
         link = _osc8_link if sys.stdout.isatty() else lambda text, _url: text
         vuln_data = [
@@ -162,6 +174,8 @@ class ColumnsFormat(VulnerabilityFormat):
             vuln_data.append(", ".join(link(a, vuln_id_url(a)) for a in vuln.aliases))
         if self.output_desc:
             vuln_data.append(vuln.description)
+        if include_ignored_reason:
+            vuln_data.append(getattr(vuln, "ignored_reason", None) or "")
         return vuln_data
 
     def _format_fix_versions(self, fix_versions: list[Version]) -> str:

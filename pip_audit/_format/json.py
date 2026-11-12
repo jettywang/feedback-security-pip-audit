@@ -82,6 +82,9 @@ class JsonFormat(VulnerabilityFormat):
             vuln_json["aliases"] = list(vuln.aliases)
         if self.output_desc:
             vuln_json["description"] = vuln.description
+        ignored_reason = getattr(vuln, "ignored_reason", None)
+        if ignored_reason is not None:
+            vuln_json["ignored_reason"] = ignored_reason
         return vuln_json
 
     def _format_fix(self, fix_version: fix.FixVersion) -> dict[str, Any]:

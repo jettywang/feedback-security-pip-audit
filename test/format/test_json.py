@@ -262,3 +262,30 @@ def test_json_skipped_fix(vuln_data, skipped_fix_data):
         ],
     }
     assert json_format.format(vuln_data, skipped_fix_data) == json.dumps(expected_json)
+
+
+def test_json_includes_exception_reason():
+    from packaging.version import Version
+
+    import pip_audit._service as service
+
+    dep = service.ResolvedDependency(name="foo", version=Version("1.0"))
+    suppressed = service.VulnerabilityResult(
+        id="VULN-1",
+        description="The second vulnerability",
+        fix_versions=[],
+        aliases={"CVE-2024-0001"},
+        ignored_reason="approved until month end",
+    )
+    json_format = format.JsonFormat(False, False)
+    rendered = json.loads(json_format.format({dep: [suppressed]}, []))
+    vuln = rendered["dependencies"][0]["vulns"][0]
+    assert vuln["ignored_reason"] == "approved until month end"
+
+
+def test_json_omits_exception_reason_when_absent(vuln_data):
+    json_format = format.JsonFormat(False, False)
+    rendered = json.loads(json_format.format(vuln_data, []))
+    for dep in rendered["dependencies"]:
+        for vuln in dep["vulns"]:
+            assert "ignored_reason" not in vuln

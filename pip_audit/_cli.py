@@ -11,6 +11,7 @@ import os
 import sys
 from collections.abc import Iterator
 from contextlib import ExitStack, contextmanager
+from dataclasses import replace
 from pathlib import Path
 from typing import IO, NoReturn, cast
 
@@ -43,6 +44,11 @@ from pip_audit._service.interface import (
 )
 from pip_audit._state import AuditSpinner, AuditState
 from pip_audit._util import assert_never
+from pip_audit._vuln_exception import (
+    VulnerabilityExceptionError,
+    find_matching_exception,
+    parse_vulnerability_exceptions,
+)
 
 logging.basicConfig()
 logger = logging.getLogger(__name__)
@@ -385,6 +391,20 @@ def _parser() -> argparse.ArgumentParser:  # pragma: no cover
         ),
     )
     parser.add_argument(
+        "--vuln-exception",
+        type=str,
+        metavar="ID:PACKAGE:VERSION_SPEC[:EXPIRES[:REASON]]",
+        action="append",
+        dest="vuln_exceptions",
+        default=[],
+        help=(
+            "suppress a vulnerability ID only for a specific package and PEP 440 version range, "
+            "optionally until an ISO YYYY-MM-DD expiration date and with a justification that is "
+            "retained in the report; this option can be used multiple times and does not affect "
+            "other packages or versions"
+        ),
+    )
+    parser.add_argument(
         "--disable-pip",
         action="store_true",
         help="don't use `pip` for dependency resolution; "
@@ -444,6 +464,11 @@ def audit() -> None:  # pragma: no cover
     """
     parser = _parser()
     args = _parse_args(parser)
+
+    try:
+        vuln_exceptions = parse_vulnerability_exceptions(args.vuln_exceptions)
+    except VulnerabilityExceptionError as exc:
+        parser.error(str(exc))
 
     service: VulnerabilityService
     if args.vulnerability_service is VulnerabilityServiceChoice.Osv:
@@ -549,6 +574,7 @@ def audit() -> None:  # pragma: no cover
         vuln_count = 0
         skip_count = 0
         vuln_ignore_count = 0
+        has_ignored_results = False
         vulns_to_ignore = set(args.ignore_vulns)
         try:
             for spec, vulns in auditor.audit(source):
@@ -567,10 +593,27 @@ def audit() -> None:  # pragma: no cover
                     filtered_vulns = [v for v in vulns if not v.has_any_id(vulns_to_ignore)]
                     vuln_ignore_count += len(vulns) - len(filtered_vulns)
                     vulns = filtered_vulns
+
+                if vuln_exceptions and not spec.is_skipped():
+                    resolved_spec = cast(ResolvedDependency, spec)
+                    scoped_vulns = []
+                    for vuln in vulns:
+                        exception = find_matching_exception(vuln_exceptions, resolved_spec, vuln)
+                        if exception is None:
+                            scoped_vulns.append(vuln)
+                        else:
+                            scoped_vulns.append(
+                                replace(vuln, ignored_reason=exception.render_reason())
+                            )
+                            vuln_ignore_count += 1
+                            has_ignored_results = True
+                    vulns = scoped_vulns
+
                 result[spec] = vulns
-                if len(vulns) > 0:
+                active_vulns = [v for v in vulns if getattr(v, "ignored_reason", None) is None]
+                if len(active_vulns) > 0:
                     pkg_count += 1
-                    vuln_count += len(vulns)
+                    vuln_count += len(active_vulns)
         except DependencySourceError as e:
             _fatal(str(e))
         except VulnServiceConnectionError as e:
@@ -588,7 +631,13 @@ def audit() -> None:  # pragma: no cover
         fixed_pkg_count = 0
         fixed_vuln_count = 0
         if args.fix:
-            for fix in resolve_fix_versions(service, result, state):
+            # Reports suppressed by scoped exceptions are intentionally kept in
+            # `result` for the report, but they must not drive an upgrade.
+            fixable_result = {
+                dep: [vuln for vuln in vulns if getattr(vuln, "ignored_reason", None) is None]
+                for dep, vulns in result.items()
+            }
+            for fix in resolve_fix_versions(service, fixable_result, state):
                 if args.dry_run:
                     if fix.is_skipped():
                         fix = cast(SkippedFixVersion, fix)
@@ -646,7 +695,9 @@ def audit() -> None:  # pragma: no cover
             file=sys.stderr,
         )
         # If our output format is a "manifest" format we always emit it,
-        # even if nothing other than a dependency summary is present.
-        if skip_count > 0 or formatter.is_manifest:
+        # even if nothing other than a dependency summary is present. We also
+        # emit it when reports have been suppressed by scoped exceptions, so
+        # that the retained exception reasons remain visible.
+        if has_ignored_results or skip_count > 0 or formatter.is_manifest:
             with _output_io(args.output) as io:
                 print(formatter.format(result, fixes), file=io)

@@ -111,6 +111,13 @@ class VulnerabilityResult:
     When the vulnerability was first published.
     """
 
+    ignored_reason: str | None = None
+    """
+    The justification for suppressing this result, if it was matched by a
+    scoped vulnerability exception. `None` means the result was not
+    suppressed.
+    """
+
     @classmethod
     def create(
         cls,

@@ -107,3 +107,41 @@ def test_columns_terminal_links(monkeypatch, vuln_data):
 {_P("foo")}  1.0     {_V("VULN-1")} 1.0          {_V("CVE-0000-00001")}
 {_P("bar")}  0.1     {_V("VULN-2")}              {_V("CVE-0000-00002")}"""
     assert columns_format.format(vuln_data, []) == expected_columns
+
+
+def _ignored_vuln_data():
+    from packaging.version import Version
+
+    import pip_audit._service as service
+
+    dep = service.ResolvedDependency(name="foo", version=Version("1.0"))
+    active = service.VulnerabilityResult(
+        id="VULN-0",
+        description="The first vulnerability",
+        fix_versions=[Version("1.1")],
+        aliases=set(),
+    )
+    suppressed = service.VulnerabilityResult(
+        id="VULN-1",
+        description="The second vulnerability",
+        fix_versions=[],
+        aliases={"CVE-2024-0001"},
+        ignored_reason="approved until month end "
+        "(exception for CVE-2024-0001 on foo ==1.0, expires 2026-11-30)",
+    )
+    return {dep: [active, suppressed]}
+
+
+def test_columns_exception_reason_column():
+    columns_format = format.ColumnsFormat(False, False)
+    rendered = columns_format.format(_ignored_vuln_data(), [])
+    lines = rendered.splitlines()
+    assert "Exception Reason" in lines[0]
+    assert "approved until month end" in rendered
+    # The active vulnerability has an empty reason cell.
+    assert "VULN-0" in rendered
+
+
+def test_columns_no_exception_reason_column_without_suppressions(vuln_data):
+    columns_format = format.ColumnsFormat(False, False)
+    assert "Exception Reason" not in columns_format.format(vuln_data, [])

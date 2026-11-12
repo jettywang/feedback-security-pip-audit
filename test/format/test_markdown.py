@@ -101,3 +101,22 @@ Name | Version | ID | Fix Versions | Applied Fix | Aliases
 {_P("foo")} | 1.0 | {_V("VULN-1")} | 1.0 | Successfully upgraded foo (1.0 => 1.8) | {_V("CVE-0000-00001")}
 {_P("bar")} | 0.1 | {_V("VULN-2")} |  | Failed to fix bar (0.1): skip-reason | {_V("CVE-0000-00002")}"""
     assert markdown_format.format(vuln_data, skipped_fix_data) == expected_markdown
+
+
+def test_markdown_exception_reason_column():
+    from packaging.version import Version
+
+    import pip_audit._service as service
+
+    dep = service.ResolvedDependency(name="foo", version=Version("1.0"))
+    suppressed = service.VulnerabilityResult(
+        id="VULN-1",
+        description="The second vulnerability",
+        fix_versions=[],
+        aliases={"CVE-2024-0001"},
+        ignored_reason="approved until month end",
+    )
+    markdown_format = format.MarkdownFormat(False, False)
+    rendered = markdown_format.format({dep: [suppressed]}, [])
+    assert "Exception Reason" in rendered
+    assert "approved until month end" in rendered
