@@ -28,7 +28,7 @@ from pip_audit._dependency_source import (
     DependencySourceError,
     InvalidRequirementSpecifier,
 )
-from pip_audit._fix import ResolvedFixVersion
+from pip_audit._fix import Constraints, ResolvedConstraint, ResolvedFixVersion
 from pip_audit._service import Dependency
 from pip_audit._service.interface import ResolvedDependency, SkippedDependency
 from pip_audit._state import AuditState
@@ -213,6 +213,48 @@ class RequirementSource(DependencySource):
                 )
                 self._recover_files(tmp_files)
                 raise e
+
+    def get_constraints(self) -> Constraints:
+        """
+        Collect the PEP 440 version specifiers declared for each package across the requirements
+        files, restricted to the requirements that apply to the current environment.
+
+        The returned constraints are used by `--fix` to avoid selecting upgrade candidates that
+        would conflict with the project's own requirements. Only requirements whose environment
+        markers evaluate in the current environment contribute; requirements gated behind markers
+        for other environments are ignored, mirroring how `pip` treats them.
+
+        Exact pins (e.g. `flask==1.0.0`) are deliberately excluded: `--fix` rewrites those lines
+        itself, so treating the current pin as an immutable constraint would make every upgrade
+        impossible. Range and compound specifiers are the genuine limits that candidates must honor.
+        """
+        constraints: Constraints = {}
+        for filename in self._filenames:
+            rf = RequirementsFile.from_file(filename)
+            for req in rf.requirements:
+                if req.req is None:
+                    continue
+                if req.marker is not None and not req.marker.evaluate():
+                    continue
+                if not req.specifier:
+                    continue
+                if PINNED_SPECIFIER_RE.match(str(req.specifier)) is not None:
+                    continue
+
+                name = canonicalize_name(req.name)
+                source = f"{filename}:{req.requirement_line.line_number}"
+                existing = constraints.get(name)
+                if existing is None:
+                    constraints[name] = ResolvedConstraint(
+                        specifiers=(req.specifier,),
+                        sources=(source,),
+                    )
+                else:
+                    constraints[name] = ResolvedConstraint(
+                        specifiers=(*existing.specifiers, req.specifier),
+                        sources=(*existing.sources, source),
+                    )
+        return constraints
 
     def _fix_file(self, filename: Path, fix_version: ResolvedFixVersion) -> None:
         # Reparse the requirements file. We want to rewrite each line to the new requirements file

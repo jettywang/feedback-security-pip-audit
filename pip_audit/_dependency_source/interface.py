@@ -8,7 +8,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from collections.abc import Iterator
 
-from pip_audit._fix import ResolvedFixVersion
+from pip_audit._fix import Constraints, ResolvedFixVersion
 from pip_audit._service import Dependency
 
 PYPI_URL = "https://pypi.org/simple/"
@@ -35,6 +35,16 @@ class DependencySource(ABC):
         Upgrade a dependency to the given fix version.
         """
         raise NotImplementedError
+
+    def get_constraints(self) -> Constraints:
+        """
+        Return the version constraints this source imposes on each package.
+
+        These constraints are used to ensure that `--fix` only selects upgrade candidates that
+        remain installable from the source. Sources without explicit version constraints (for
+        example, an already-installed environment audited via `pip`) return an empty mapping.
+        """
+        return {}
 
 
 class DependencySourceError(Exception):

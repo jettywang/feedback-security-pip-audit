@@ -17,8 +17,8 @@ from pip_audit._dependency_source import (
     DependencySourceError,
     requirement,
 )
-from pip_audit._fix import ResolvedFixVersion
-from pip_audit._service import ResolvedDependency, SkippedDependency
+from pip_audit._fix import ResolvedFixVersion, SkippedFixVersion, resolve_fix_versions
+from pip_audit._service import ResolvedDependency, SkippedDependency, VulnerabilityResult
 from pip_audit._state import AuditState
 from pip_audit._virtual_env import VirtualEnv, VirtualEnvError
 
@@ -915,3 +915,149 @@ def test_requirement_source_disable_pip_editable_without_egg_fragment(req_file):
         )
         in specs
     )
+
+
+def _static_service(vulns_by_version):
+    from pip_audit._service.interface import VulnerabilityService
+
+    class StaticService(VulnerabilityService):
+        def query(self, spec):
+            return spec, list(vulns_by_version.get(spec.version, []))
+
+    return StaticService()
+
+
+def test_get_constraints_aggregates_and_ignores_inactive_markers(req_file):
+    req_path = req_file()
+    with open(req_path, "w") as f:
+        f.write(
+            "flask<2.0\n"
+            "flask>=1.0\n"
+            'requests>=1.0; python_version >= "3.0"\n'
+            'flask<9.9; sys_platform == "definitely-not-this-os"\n'
+        )
+
+    source = requirement.RequirementSource([req_path])
+    constraints = source.get_constraints()
+
+    # The two active flask specifiers are combined; the marker-gated flask line is excluded.
+    flask = constraints["flask"]
+    assert [str(s) for s in flask.specifiers] == ["<2.0", ">=1.0"]
+    assert all("line" not in s for s in flask.sources)
+    assert any(str(req_path) in s and ":1" in s for s in flask.sources)
+    assert any(str(req_path) in s and ":2" in s for s in flask.sources)
+
+    # An active marker still contributes.
+    assert constraints["requests"].contains(Version("1.5")) and "requests" in constraints
+
+    # The marker that does not evaluate in this environment contributes nothing.
+    assert all(str(s) != "<9.9" for s in flask.specifiers)
+
+
+def test_fix_respects_requirement_constraint_and_edits_file(req_file):
+    # End-to-end: the constraint flask<2.0 (in a constraints-style file) forces resolution to skip
+    # 2.0.0 and land on 1.5.0. The pinned requirement line is then rewritten to that version.
+    pin_path, constraint_path = req_file(), req_file()
+    with open(pin_path, "w") as f:
+        f.write("flask==1.0.0")
+    with open(constraint_path, "w") as f:
+        f.write("flask<2.0")
+
+    source = requirement.RequirementSource([pin_path, constraint_path])
+    dep = ResolvedDependency(name="flask", version=Version("1.0.0"))
+    result = {
+        dep: [
+            VulnerabilityResult(
+                id="VULN-1",
+                description="",
+                fix_versions=[Version("1.5.0"), Version("2.0.0")],
+                aliases=set(),
+            )
+        ]
+    }
+    fixes = list(
+        resolve_fix_versions(
+            _static_service({}),
+            result,
+            constraints=source.get_constraints(),
+        )
+    )
+    assert fixes == [ResolvedFixVersion(dep=dep, version=Version("1.5.0"))]
+
+    source.fix(fixes[0])
+    with open(pin_path) as f:
+        assert f.read().strip() == "flask==1.5.0"
+    # The constraints file itself is not rewritten (its specifier already admits 1.5.0).
+    with open(constraint_path) as f:
+        assert f.read().strip() == "flask<2.0"
+
+
+def test_fix_conflicting_constraint_preserves_file_and_names_limit(req_file):
+    # No advertised fix version satisfies flask<2.0. Resolution must skip, the original file must
+    # remain byte-for-byte unchanged, and the reason must name the blocking constraint.
+    req_path = req_file()
+    original = "flask<2.0\n"
+    with open(req_path, "w") as f:
+        f.write(original)
+
+    source = requirement.RequirementSource([req_path])
+    dep = ResolvedDependency(name="flask", version=Version("1.0.0"))
+    result = {
+        dep: [
+            VulnerabilityResult(
+                id="VULN-1",
+                description="",
+                fix_versions=[Version("2.0.0"), Version("3.0.0")],
+                aliases=set(),
+            )
+        ]
+    }
+    fixes = list(
+        resolve_fix_versions(
+            _static_service({}),
+            result,
+            constraints=source.get_constraints(),
+        )
+    )
+
+    assert len(fixes) == 1
+    skipped = fixes[0]
+    assert isinstance(skipped, SkippedFixVersion)
+    assert "<2.0" in skipped.skip_reason
+    assert str(req_path) in skipped.skip_reason
+    assert "VULN-1" in skipped.skip_reason
+
+    # A skipped fix never reaches source.fix, so the file is untouched.
+    with open(req_path) as f:
+        assert f.read() == original
+
+
+def test_fix_constraint_conflict_appears_in_report(req_file):
+    # The same conflict must be visible in the formatted report, not just the in-memory object.
+    from pip_audit._format import ColumnsFormat
+
+    req_path = req_file()
+    with open(req_path, "w") as f:
+        f.write("flask<2.0")
+
+    source = requirement.RequirementSource([req_path])
+    dep = ResolvedDependency(name="flask", version=Version("1.0.0"))
+    vuln = VulnerabilityResult(
+        id="VULN-1",
+        description="",
+        fix_versions=[Version("2.0.0")],
+        aliases=set(),
+    )
+    result = {dep: [vuln]}
+    fixes = list(
+        resolve_fix_versions(
+            _static_service({}),
+            result,
+            constraints=source.get_constraints(),
+        )
+    )
+
+    report = ColumnsFormat(output_desc=False, output_aliases=False).format(result, fixes)
+    assert "Failed to fix flask" in report
+    assert "<2.0" in report
+    assert "VULN-1" in report

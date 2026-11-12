@@ -8,6 +8,17 @@ All versions prior to 0.0.9 are untracked.
 
 ## [Unreleased]
 
+### Changed
+
+* `--fix` now resolves the smallest applicable upgrade candidate and respects
+  the version constraints declared in the audited requirements files. When no
+  candidate satisfies both the vulnerability and the project's constraints, the
+  dependency is skipped with a reason naming the blocking constraint, and the
+  requirements files are left unchanged instead of being rewritten to a version
+  that cannot be installed. Environment markers that do not apply to the current
+  environment are ignored, and prereleases are excluded unless explicitly
+  allowed.
+
 ### Fixed
 
 * Editable requirements skipped with `--skip-editable` no longer require a hash

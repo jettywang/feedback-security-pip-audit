@@ -588,7 +588,11 @@ def audit() -> None:  # pragma: no cover
         fixed_pkg_count = 0
         fixed_vuln_count = 0
         if args.fix:
-            for fix in resolve_fix_versions(service, result, state):
+            # Collect the source's version constraints up front so that fix resolution never picks
+            # an upgrade that the project can't install. This lets us report a conflict without
+            # first mutating the requirements files.
+            constraints = source.get_constraints()
+            for fix in resolve_fix_versions(service, result, state, constraints):
                 if args.dry_run:
                     if fix.is_skipped():
                         fix = cast(SkippedFixVersion, fix)
